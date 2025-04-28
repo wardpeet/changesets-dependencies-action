@@ -11,7 +11,6 @@ import { stat, mkdirp, writeFile, unlink } from "fs-extra";
 import * as gitUtils from "./git-utils";
 import sanitize from "sanitize-filename";
 import { coerce as coerceVersion } from "semver";
-import prettier from "prettier";
 import { exec } from "@actions/exec";
 
 function textify(d: IChange, location: string) {
@@ -41,6 +40,8 @@ function isRelevantChange(change: IChange): boolean {
 }
 
 async function tryPrettier(workdir: string, content: string): Promise<string> {
+  const prettier = await import("prettier");
+
   try {
     const prettierConfig = await prettier.resolveConfig(workdir).catch((e) => {
       console.warn(`Failed to load prettier config file (using default)`, e);
@@ -134,8 +135,10 @@ async function fetchJsonFile(
 
   console.debug(`Using base Git SHA for checking previous state: ${baseSha}`);
 
-  await setupGitUser();
-  await setupGitCredentials(githubToken);
+  if (process.env.SKIP_CREDENTIALS !== "1") {
+    await setupGitUser();
+    await setupGitCredentials(githubToken);
+  }
 
   const issueContext = github.context.issue;
 
@@ -209,10 +212,13 @@ async function fetchJsonFile(
       );
     }
   }
-
   const branch = github.context.payload.pull_request!.head.ref;
   await gitUtils.fetch();
-  await gitUtils.switchToMaybeExistingBranch(branch);
+  try {
+    await gitUtils.switchToMaybeExistingBranch(branch);
+  } catch (e) {
+    console.warn(e.message);
+  }
 
   const changesetBase = path.resolve(workdir, ".changeset");
   await mkdirp(changesetBase).catch(() => null);
