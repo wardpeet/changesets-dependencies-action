@@ -180,6 +180,7 @@ async function fetchJsonFile(
     {
       dependencies: IChange[];
       peerDependencies: IChange[];
+      devDependencies: IChange[];
     }
   >();
 
@@ -195,6 +196,7 @@ async function fetchJsonFile(
         changes.set(pkg.packageJson.name, {
           dependencies: [],
           peerDependencies: [],
+          devDependencies: [],
         });
       }
 
@@ -206,6 +208,12 @@ async function fetchJsonFile(
         oldPackageFile.peerDependencies || {},
         pkg.packageJson.peerDependencies || {}
       );
+      if (process.env.INCLUDE_DEV_DEPS === "1") {
+        changes.get(pkg.packageJson.name)!.devDependencies = diff(
+          oldPackageFile.devDependencies || {},
+          pkg.packageJson.devDependencies || {}
+        );
+      }
     } else {
       core.warning(
         `Failed to locate previous file content of ${pkg.relativePath}, skipping ${pkg.packageJson.name}...`
@@ -231,6 +239,9 @@ async function fetchJsonFile(
       ...value.peerDependencies
         .filter(isRelevantChange)
         .map((d) => textify(d, "peerDependencies")),
+      ...value.peerDependencies
+        .filter(isRelevantChange)
+        .map((d) => textify(d, "devDependencies")),
     ].map((t) => `- ${t}`);
 
     console.debug("package update summary", {
